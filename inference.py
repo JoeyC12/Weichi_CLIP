@@ -48,7 +48,10 @@ query_vector = np.array(text_embedding)
 # 遍历所有图像向量计算相似度
 for i in range(k):
     image = embeddings["images"][i]
+    if image["embedding"] == None:
+        continue
     image_vector = np.array(image["embedding"])
+   
     similarity = cosine_similarity(query_vector, image_vector)
     similarity_list.append({
         "image_path": image["image_path"],
