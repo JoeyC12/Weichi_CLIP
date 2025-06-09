@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>模板检索系统</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    .tags { margin-bottom: 10px; }
+    .tag { display: inline-block; background: #eee; border-radius: 4px; padding: 2px 8px; margin: 2px; cursor: pointer; }
+    .template { display: inline-block; width: 260px; margin: 10px; vertical-align: top; border: 1px solid #ddd; border-radius: 6px; padding: 10px;}
+    .template img { width: 100%; border-radius: 4px; }
+    .similarity { color: #1890ff; font-weight: bold; }
+    .tag.selected { background: #1890ff; color: #fff; }
+  </style>
+</head>
+<body>
+  <h2>模板检索系统</h2>
+  <div>
+    <input id="textQuery" type="text" placeholder="输入想要的模版类型" style="width: 300px;">
+    <button onclick="textSearch()">文字搜索</button>
+    <input id="imgInput" type="file" accept="image/*" style="margin-left:20px;" onchange="imgSearch(event)">
+    <button onclick="loadAll()">显示全部模板</button>
+  </div>
+  <div style="margin:20px 0;">
+    <div><b>行业标签：</b><span id="industryTags"></span></div>
+    <div><b>色系标签：</b><span id="colorTags"></span></div>
+    <div><b>风格标签：</b><span id="styleTags"></span></div>
+  </div>
+  <div id="templates"></div>
+
+  <script>
+    const industryTags = ["建筑装修", "数码电子", "化工医疗", "服装鞋袜", "IT软件", "机械五金", "印刷", "农业模板", "汽车配件", "机械机电", "光伏能源", "交通运输", "家装建材", "工业设备", "商业服务"];
+    const colorTags = ["黑", "红", "黄", "棕", "橙", "紫", "白", "蓝", "绿"];
+    const styleTags = ["商务风格", "渐变", "动态效果", "极简主义", "静态展示", "双色对比", "卡片式", "奢华高端", "未来科技感", "现代感", "工业风", "柔色", "单色系", "暗黑", "自然有机", "自然", "有机", "高饱和度", "明亮"];
+
+    let selectedIndustry = null;
+    let selectedColor = null;
+    let selectedStyle = null;
+    let allTemplates = [];
+    let currentTemplates = [];
+
+    function renderTags() {
+      document.getElementById('industryTags').innerHTML = industryTags.map(t =>
+        `<span class="tag${selectedIndustry===t?' selected':''}" onclick="selectTag('industry','${t}')">${t}</span>`
+      ).join('');
+      document.getElementById('colorTags').innerHTML = colorTags.map(t =>
+        `<span class="tag${selectedColor===t?' selected':''}" onclick="selectTag('color','${t}')">${t}</span>`
+      ).join('');
+      document.getElementById('styleTags').innerHTML = styleTags.map(t =>
+        `<span class="tag${selectedStyle===t?' selected':''}" onclick="selectTag('style','${t}')">${t}</span>`
+      ).join('');
+    }
+
+    function selectTag(type, tag) {
+      if(type==='industry') selectedIndustry = (selectedIndustry===tag ? null : tag);
+      if(type==='color') selectedColor = (selectedColor===tag ? null : tag);
+      if(type==='style') selectedStyle = (selectedStyle===tag ? null : tag);
+      renderTags();
+      filterTemplates();
+    }
+
+    function filterTemplates() {
+      let filtered = currentTemplates;
+      if(selectedIndustry) {
+        console.log('selectedIndustry:', JSON.stringify(selectedIndustry));
+        filtered = filtered.filter(tpl => {
+          console.log('tpl.industry:', JSON.stringify(tpl.industry));
+          let arr = Array.isArray(tpl.industry) ? tpl.industry : [tpl.industry];
+          return arr.some(x => String(x).trim() === String(selectedIndustry).trim());
+        });
+      }
+      if(selectedColor) filtered = filtered.filter(tpl =>
+        Array.isArray(tpl.colors) && tpl.colors.includes(selectedColor)
+      );
+      if(selectedStyle) filtered = filtered.filter(tpl =>
+        Array.isArray(tpl.styles) && tpl.styles.includes(selectedStyle)
+      );
+      renderTemplates(filtered);
+    }
+
+    function renderTemplates(templates) {
+      if (templates.length === 0) {
+        document.getElementById('templates').innerHTML = '<div style="margin:30px;color:#888;">没有符合条件的模板</div>';
+        return;
+      }
+      const html = templates.map(tpl => `
+        <div class="template">
+          <img src="${tpl.image_path}" alt="">
+          <div>
+            ${(tpl.industry||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+            ${(tpl.colors||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+            ${(tpl.styles||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+          </div>
+          ${tpl.similarity!==undefined ? `<div class="similarity">相似度: ${tpl.similarity.toFixed(4)}</div>` : ''}
+        </div>
+      `).join('');
+      document.getElementById('templates').innerHTML = html;
+    }
+
+    function loadAll() {
+      fetch('/api/templates').then(r=>r.json()).then(data => {
+        allTemplates = data.templates;
+        currentTemplates = data.templates;
+        renderTags();
+        filterTemplates();
+      });
+    }
+
+    function textSearch() {
+      const query = document.getElementById('textQuery').value;
+      fetch('/api/inference', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({query})
+      }).then(r=>r.json()).then(data => {
+        currentTemplates = data.templates;
+        renderTags();
+        filterTemplates();
+      });
+    }
+
+    function imgSearch(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('image', file);
+      fetch('/api/search_similar', {
+        method: 'POST',
+        body: formData
+      }).then(r=>r.json()).then(data => {
+        currentTemplates = data.templates;
+        renderTags();
+        filterTemplates();
+      });
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>

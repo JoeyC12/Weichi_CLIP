@@ -75,7 +75,7 @@ def image_to_json(image_path):
     try:
         raw = result.output['choices'][0]['message']['content'][0]['text']
         clean = extract_json_from_markdown(raw)
-        return json.loads(clean)
+        return clean
     except Exception as e:
         print(f"⚠️ 无法解析为 JSON：{e}")
         print(f"⚠️ 原始返回内容为：{result.output['choices'][0]['message']['content']}")
@@ -112,13 +112,13 @@ print("已创建 embeddings.json 并预留 22 个位置")
 for i, item in enumerate(output_data["images"]):
     image_path = item["image_path"]
     image_description = describe_image(image_path)[0]['text']
-
-    json_ = image_to_json(image_path)
+    json_text = image_to_json(image_path)
+    json_ = json.loads(json_text)
     
     print(image_description)
     print(json_)
  
-    image_embedding = 0.3 * np.array(encode_text(image_description)) + 0.7 * np.array(encode_image(image_path))
+    image_embedding = 0.0 * np.array(encode_text(image_description)) + 0.0 * np.array(encode_image(image_path)) + 0.5* np.array(encode_text(json_text))
     if image_embedding is not None:
         
         output_data["images"][i]["embedding"] = image_embedding.tolist()
